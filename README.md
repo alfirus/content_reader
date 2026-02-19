@@ -1,14 +1,38 @@
 # Content Reader 📱
 
-A Flutter-based RSS feed reader application with a built-in REST API for AI integration.
+A Flutter-based RSS feed reader application with built-in AI integration, REST API, and cross-platform support.
 
 ## Features
 
 - 📰 **RSS/Atom Feed Reader** - Fetch and read articles from RSS feeds
 - 📂 **Category Management** - Organize feeds into categories
 - 💾 **Local Storage** - Save articles for offline reading
-- 🔌 **Built-in REST API** - Control the app remotely
+- 🔌 **Built-in REST API** - Control the app remotely on port 1212
 - 🔐 **API Key Authentication** - Secure API access
+- 🤖 **AI Summarization** - Summarize articles using OpenClaw
+- 🌙 **Dark/Light Theme** - Toggle between dark and light mode
+- 🔄 **Background Refresh** - Auto-fetch new articles in background
+
+## New AI Features
+
+### Setup
+1. Enable **AI Summarization** in Settings
+2. Enable **OpenClaw Integration** in Settings
+3. Start the OpenClaw server:
+
+```bash
+# Terminal 1: Start OpenClaw gateway
+openclaw gateway start
+
+# Terminal 2: Start the HTTP server wrapper
+cd ~/Projects/zed-openclaw/server
+node openclaw-server.js
+```
+
+### Usage
+- Open any article
+- Tap the ✨ sparkle button to generate an AI summary
+- The summary will be saved with the article
 
 ## Built-in REST API
 
@@ -64,50 +88,37 @@ for article in articles:
         # Send to AI for processing...
 ```
 
-#### AI Article Summarization
-```python
-# Send article to AI and update with summary
-def summarize_article(article_id, content):
-    # Use your favorite AI API (OpenAI, Claude, Gemini, etc.)
-    summary = call_ai_summarize(content)
-    
-    # Update article via API
-    requests.put(
-        f"{BASE_URL}/articles/{article_id}",
-        headers=headers,
-        json={"summary": summary}
-    )
-```
-
-#### AI-Powered Feed Analysis
-```python
-# Get all feeds and analyze with AI
-response = requests.get(f"{BASE_URL}/feeds", headers=headers)
-feeds = response.json()
-
-for feed in feeds:
-    # Use AI to categorize or analyze feed content
-    category = call_ai_categorize(feed['description'])
-    # Update feed with AI-suggested category
-```
-
 ## Getting Started
 
 ```bash
+# Install dependencies
+flutter pub get
+
 # Run the app
 flutter run
 
 # Run on specific platform
 flutter run -d ios
 flutter run -d android
+flutter run -d macos
+```
+
+### Build for macOS
+```bash
+flutter build macos
+# Output: build/macos/Build/Products/Release/content_reader_flutter.app
+
+# Copy to Applications
+cp -r build/macos/Build/Products/Release/content_reader_flutter.app /Applications/
 ```
 
 ## Tech Stack
 
-- **Flutter** - UI framework
+- **Flutter** - UI framework (Material 3)
 - **SQLite** - Local database
 - **Shelf** - REST API server
 - **webfeed_plus** - RSS/Atom parsing
+- **OpenClaw** - AI summarization
 
 ## License
 

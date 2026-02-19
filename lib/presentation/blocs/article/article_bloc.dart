@@ -47,6 +47,14 @@ class DeleteArticle extends ArticleEvent {
   List<Object?> get props => [articleId];
 }
 
+class UpdateArticle extends ArticleEvent {
+  final Article article;
+  UpdateArticle(this.article);
+  
+  @override
+  List<Object?> get props => [article];
+}
+
 class FilterArticles extends ArticleEvent {
   final ArticleFilter filter;
   FilterArticles(this.filter);
@@ -97,6 +105,7 @@ class ArticleBloc extends Bloc<ArticleEvent, ArticleState> {
     on<MarkArticleAsRead>(_onMarkArticleAsRead);
     on<ToggleArticleSaved>(_onToggleArticleSaved);
     on<DeleteArticle>(_onDeleteArticle);
+    on<UpdateArticle>(_onUpdateArticle);
     on<FilterArticles>(_onFilterArticles);
   }
 
@@ -165,6 +174,15 @@ class ArticleBloc extends Bloc<ArticleEvent, ArticleState> {
   Future<void> _onDeleteArticle(DeleteArticle event, Emitter<ArticleState> emit) async {
     try {
       await DatabaseHelper.instance.deleteArticle(event.articleId);
+      _reloadCurrentFilter();
+    } catch (e) {
+      emit(ArticleError(e.toString()));
+    }
+  }
+
+  Future<void> _onUpdateArticle(UpdateArticle event, Emitter<ArticleState> emit) async {
+    try {
+      await DatabaseHelper.instance.updateArticle(event.article);
       _reloadCurrentFilter();
     } catch (e) {
       emit(ArticleError(e.toString()));

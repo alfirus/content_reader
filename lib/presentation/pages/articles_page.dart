@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 import '../blocs/article/article_bloc.dart';
+import '../blocs/settings/settings_bloc.dart';
 import '../../data/models/article.dart';
 import 'article_detail_page.dart';
 
@@ -265,8 +266,11 @@ class _ArticleCard extends StatelessWidget {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (_) => BlocProvider.value(
-                value: context.read<ArticleBloc>(),
+              builder: (_) => MultiBlocProvider(
+                providers: [
+                  BlocProvider.value(value: context.read<ArticleBloc>()),
+                  BlocProvider.value(value: context.read<SettingsBloc>()),
+                ],
                 child: ArticleDetailPage(article: article),
               ),
             ),
@@ -401,8 +405,11 @@ class _ArticleCardDesktop extends StatelessWidget {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (_) => BlocProvider.value(
-                value: context.read<ArticleBloc>(),
+              builder: (_) => MultiBlocProvider(
+                providers: [
+                  BlocProvider.value(value: context.read<ArticleBloc>()),
+                  BlocProvider.value(value: context.read<SettingsBloc>()),
+                ],
                 child: ArticleDetailPage(article: article),
               ),
             ),

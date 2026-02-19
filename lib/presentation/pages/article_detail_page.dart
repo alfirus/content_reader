@@ -4,12 +4,105 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:intl/intl.dart';
 import '../blocs/article/article_bloc.dart';
+import '../blocs/settings/settings_bloc.dart';
 import '../../data/models/article.dart';
+import '../../core/ai/ai_service.dart';
 
-class ArticleDetailPage extends StatelessWidget {
+class ArticleDetailPage extends StatefulWidget {
   final Article article;
 
   const ArticleDetailPage({super.key, required this.article});
+
+  @override
+  State<ArticleDetailPage> createState() => _ArticleDetailPageState();
+}
+
+class _ArticleDetailPageState extends State<ArticleDetailPage> {
+  bool _isSummarizing = false;
+  String? _aiSummary;
+
+  @override
+  void initState() {
+    super.initState();
+    _aiSummary = widget.article.summary;
+  }
+
+  Future<void> _summarizeArticle() async {
+    // Check if settings are loaded
+    final settingsState = context.read<SettingsBloc>().state;
+    
+    if (!settingsState.aiSummarizationEnabled) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Enable AI Summarization in Settings first'),
+          ),
+        );
+      }
+      return;
+    }
+
+    if (!settingsState.openClawEnabled) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Enable OpenClaw Integration in Settings first'),
+          ),
+        );
+      }
+      return;
+    }
+
+    setState(() => _isSummarizing = true);
+
+    try {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Fetching article and summarizing...'),
+            duration: Duration(seconds: 1),
+          ),
+        );
+      }
+      
+      final summary = await AiService.instance.summarize(widget.article);
+      
+      if (summary != null && mounted) {
+        setState(() => _aiSummary = summary);
+        
+        // Update article with summary
+        final updatedArticle = widget.article.copyWith(summary: summary);
+        context.read<ArticleBloc>().add(UpdateArticle(updatedArticle));
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Summary generated!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Could not generate summary'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSummarizing = false);
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -20,12 +113,12 @@ class ArticleDetailPage extends StatelessWidget {
         slivers: [
           // App Bar with Image
           SliverAppBar(
-            expandedHeight: article.imageUrl != null ? 250 : 0,
+            expandedHeight: widget.article.imageUrl != null ? 250 : 0,
             pinned: true,
-            flexibleSpace: article.imageUrl != null
+            flexibleSpace: widget.article.imageUrl != null
                 ? FlexibleSpaceBar(
                     background: Image.network(
-                      article.imageUrl!,
+                      widget.article.imageUrl!,
                       fit: BoxFit.cover,
                       errorBuilder: (_, __, ___) => Container(
                         color: Colors.grey[300],
@@ -35,25 +128,42 @@ class ArticleDetailPage extends StatelessWidget {
                   )
                 : null,
             actions: [
+              // AI Summarize Button
+              BlocBuilder<SettingsBloc, SettingsState>(
+                builder: (context, state) {
+                  if (!state.aiSummarizationEnabled) return const SizedBox();
+                  return IconButton(
+                    icon: _isSummarizing
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.auto_awesome),
+                    onPressed: _isSummarizing ? null : _summarizeArticle,
+                    tooltip: 'Summarize with AI',
+                  );
+                },
+              ),
               IconButton(
                 icon: Icon(
-                  article.isSaved ? Icons.bookmark : Icons.bookmark_outline,
+                  widget.article.isSaved ? Icons.bookmark : Icons.bookmark_outline,
                 ),
                 onPressed: () {
-                  context.read<ArticleBloc>().add(ToggleArticleSaved(article));
+                  context.read<ArticleBloc>().add(ToggleArticleSaved(widget.article));
                   Navigator.pop(context);
                 },
               ),
               IconButton(
                 icon: const Icon(Icons.share),
                 onPressed: () {
-                  Share.share('${article.title}\n${article.link}');
+                  Share.share('${widget.article.title}\n${widget.article.link}');
                 },
               ),
               IconButton(
                 icon: const Icon(Icons.open_in_browser),
                 onPressed: () async {
-                  final uri = Uri.parse(article.link);
+                  final uri = Uri.parse(widget.article.link);
                   if (await canLaunchUrl(uri)) {
                     await launchUrl(uri, mode: LaunchMode.externalApplication);
                   }
@@ -67,7 +177,7 @@ class ArticleDetailPage extends StatelessWidget {
             sliver: SliverList(
               delegate: SliverChildListDelegate([
                 Text(
-                  article.title,
+                  widget.article.title,
                   style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
@@ -75,34 +185,76 @@ class ArticleDetailPage extends StatelessWidget {
                 const SizedBox(height: 12),
                 Row(
                   children: [
-                    if (article.author.isNotEmpty) ...[
+                    if (widget.article.author.isNotEmpty) ...[
                       const Icon(Icons.person_outline, size: 16),
                       const SizedBox(width: 4),
-                      Text(article.author),
+                      Text(widget.article.author),
                       const SizedBox(width: 16),
                     ],
                     const Icon(Icons.calendar_today, size: 16),
                     const SizedBox(width: 4),
-                    Text(dateFormat.format(article.published)),
+                    Text(dateFormat.format(widget.article.published)),
                   ],
                 ),
                 const Divider(height: 32),
+                
+                // AI Summary Section
+                if (_aiSummary != null && _aiSummary!.isNotEmpty) ...[
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.primaryContainer,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.auto_awesome,
+                              size: 16,
+                              color: Theme.of(context).colorScheme.onPrimaryContainer,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'AI Summary',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Theme.of(context).colorScheme.onPrimaryContainer,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          _aiSummary!,
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.onPrimaryContainer,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+                
                 SelectableText(
-                  article.content.isNotEmpty 
-                      ? _stripHtml(article.content) 
-                      : article.summary.isNotEmpty 
-                          ? _stripHtml(article.summary) 
+                  widget.article.content.isNotEmpty 
+                      ? _stripHtml(widget.article.content) 
+                      : widget.article.summary.isNotEmpty 
+                          ? _stripHtml(widget.article.summary) 
                           : 'No content available',
                   style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                     height: 1.6,
                   ),
                 ),
                 const SizedBox(height: 32),
-                if (article.link.isNotEmpty)
+                if (widget.article.link.isNotEmpty)
                   Center(
                     child: FilledButton.icon(
                       onPressed: () async {
-                        final uri = Uri.parse(article.link);
+                        final uri = Uri.parse(widget.article.link);
                         if (await canLaunchUrl(uri)) {
                           await launchUrl(uri, mode: LaunchMode.externalApplication);
                         }

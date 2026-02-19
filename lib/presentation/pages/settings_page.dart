@@ -17,6 +17,8 @@ class SettingsPage extends StatelessWidget {
         builder: (context, state) {
           return ListView(
             children: [
+              // Appearance Section
+              _sectionHeader('Appearance'),
               SwitchListTile(
                 title: const Text('Dark Mode'),
                 subtitle: const Text('Enable dark theme'),
@@ -29,6 +31,51 @@ class SettingsPage extends StatelessWidget {
                 ),
               ),
               const Divider(),
+              
+              // AI Features Section
+              _sectionHeader('AI Features'),
+              SwitchListTile(
+                title: const Text('AI Summarization'),
+                subtitle: const Text('Summarize articles using AI'),
+                value: state.aiSummarizationEnabled,
+                onChanged: (_) {
+                  context.read<SettingsBloc>().add(ToggleAiSummarization());
+                },
+                secondary: const Icon(Icons.summarize),
+              ),
+              SwitchListTile(
+                title: const Text('OpenClaw Integration'),
+                subtitle: const Text('Use local OpenClaw for AI features'),
+                value: state.openClawEnabled,
+                onChanged: (_) {
+                  context.read<SettingsBloc>().add(ToggleOpenClawIntegration());
+                },
+                secondary: const Icon(Icons.smart_toy),
+              ),
+              if (state.openClawEnabled)
+                ListTile(
+                  leading: const Icon(Icons.link),
+                  title: const Text('OpenClaw URL'),
+                  subtitle: Text(state.openClawUrl),
+                  onTap: () => _showOpenClawUrlDialog(context, state.openClawUrl),
+                ),
+              const Divider(),
+              
+              // Background Section
+              _sectionHeader('Background'),
+              SwitchListTile(
+                title: const Text('Background Refresh'),
+                subtitle: const Text('Automatically fetch new articles'),
+                value: state.backgroundRefreshEnabled,
+                onChanged: (_) {
+                  context.read<SettingsBloc>().add(ToggleBackgroundRefresh());
+                },
+                secondary: const Icon(Icons.refresh),
+              ),
+              const Divider(),
+              
+              // API Section
+              _sectionHeader('API'),
               ListTile(
                 leading: const Icon(Icons.key),
                 title: const Text('API Key'),
@@ -67,7 +114,6 @@ class SettingsPage extends StatelessWidget {
                   );
 
                   if (confirmed == true && context.mounted) {
-                    // Show loading
                     showDialog(
                       context: context,
                       barrierDismissible: false,
@@ -76,17 +122,19 @@ class SettingsPage extends StatelessWidget {
                       ),
                     );
 
-                    // Regenerate key directly
                     final newKey = await ApiService().regenerateApiKey();
                     
                     if (context.mounted) {
-                      Navigator.pop(context); // Close loading
+                      Navigator.pop(context);
                       _showApiKeyDialog(context, newKey);
                     }
                   }
                 },
               ),
               const Divider(),
+              
+              // About Section
+              _sectionHeader('About'),
               ListTile(
                 leading: const Icon(Icons.info_outline),
                 title: const Text('About'),
@@ -103,6 +151,20 @@ class SettingsPage extends StatelessWidget {
             ],
           );
         },
+      ),
+    );
+  }
+
+  Widget _sectionHeader(String title) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+      child: Text(
+        title,
+        style: const TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.bold,
+          color: Colors.grey,
+        ),
       ),
     );
   }
@@ -153,6 +215,36 @@ class SettingsPage extends StatelessWidget {
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showOpenClawUrlDialog(BuildContext context, String currentUrl) {
+    final controller = TextEditingController(text: currentUrl);
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('OpenClaw URL'),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(
+            labelText: 'Gateway URL',
+            hintText: 'http://localhost:18789',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              context.read<SettingsBloc>().add(UpdateOpenClawUrl(controller.text));
+              Navigator.pop(context);
+            },
+            child: const Text('Save'),
           ),
         ],
       ),

@@ -61,6 +61,15 @@ class _ArticlesPageState extends State<ArticlesPage> with SingleTickerProviderSt
     return Scaffold(
       appBar: AppBar(
         title: const Text('Articles'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.search),
+            onPressed: () {
+              Navigator.pushNamed(context, '/search');
+            },
+            tooltip: 'Search articles',
+          ),
+        ],
         bottom: TabBar(
           controller: _tabController,
           tabs: const [
@@ -87,6 +96,15 @@ class _ArticlesPageState extends State<ArticlesPage> with SingleTickerProviderSt
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Articles'),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.search),
+              onPressed: () {
+                Navigator.pushNamed(context, '/search');
+              },
+              tooltip: 'Search articles',
+            ),
+          ],
           bottom: const TabBar(
             tabs: [
               Tab(text: 'All'),

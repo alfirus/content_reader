@@ -165,10 +165,44 @@ class DatabaseHelper {
     return await db.insert('articles', article.toMap()..remove('id'));
   }
 
-  Future<List<Article>> getAllArticles() async {
+  Future<List<Article>> getAllArticles({
+    int limit = 50,
+    int offset = 0,
+    String? searchQuery,
+  }) async {
     final db = await database;
-    final result = await db.query('articles', orderBy: 'published DESC');
+    String query = 'SELECT * FROM articles';
+    List<dynamic> args = [];
+    
+    if (searchQuery != null && searchQuery.isNotEmpty) {
+      query += ' WHERE title LIKE ? OR content LIKE ? OR summary LIKE ?';
+      final likeQuery = '%$searchQuery%';
+      args.addAll([likeQuery, likeQuery, likeQuery]);
+      query += ' ORDER BY published DESC LIMIT ? OFFSET ?';
+      args.addAll([limit, offset]);
+    } else {
+      query += ' ORDER BY published DESC LIMIT ? OFFSET ?';
+      args.addAll([limit, offset]);
+    }
+    
+    final result = await db.rawQuery(query, args);
     return result.map((map) => Article.fromMap(map)).toList();
+  }
+  
+  /// Get total article count (for pagination)
+  Future<int> getArticleCount({String? searchQuery}) async {
+    final db = await database;
+    String query = 'SELECT COUNT(*) as count FROM articles';
+    List<dynamic> args = [];
+    
+    if (searchQuery != null && searchQuery.isNotEmpty) {
+      query += ' WHERE title LIKE ? OR content LIKE ? OR summary LIKE ?';
+      final likeQuery = '%$searchQuery%';
+      args.addAll([likeQuery, likeQuery, likeQuery]);
+    }
+    
+    final result = await db.rawQuery(query, args);
+    return result.first['count'] as int? ?? 0;
   }
 
   Future<List<Article>> getArticlesByFeed(int feedId) async {

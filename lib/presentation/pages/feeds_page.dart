@@ -421,6 +421,8 @@ class _FeedsPageState extends State<FeedsPage> {
   void _showAddFeedDialog(BuildContext context) {
     final urlController = TextEditingController();
     int? selectedCategoryId = _selectedCategoryId;
+    bool isValidating = false;
+    String? validationError;
 
     showDialog(
       context: context,
@@ -434,12 +436,23 @@ class _FeedsPageState extends State<FeedsPage> {
               children: [
                 TextField(
                   controller: urlController,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     hintText: 'Enter RSS feed URL',
                     labelText: 'URL',
-                    prefixIcon: Icon(Icons.link),
+                    prefixIcon: const Icon(Icons.link),
+                    errorText: validationError,
+                    suffixIcon: isValidating
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : null,
                   ),
                   keyboardType: TextInputType.url,
+                  onChanged: (_) {
+                    setDialogState(() => validationError = null);
+                  },
                 ),
                 const SizedBox(height: 16),
                 BlocBuilder<CategoryBloc, CategoryState>(
@@ -489,14 +502,37 @@ class _FeedsPageState extends State<FeedsPage> {
               child: const Text('Cancel'),
             ),
             FilledButton(
-              onPressed: () {
-                if (urlController.text.isNotEmpty) {
-                  context.read<FeedBloc>().add(
-                    AddFeed(urlController.text.trim(), categoryId: selectedCategoryId),
-                  );
-                  Navigator.pop(dialogContext);
-                }
-              },
+              onPressed: isValidating
+                  ? null
+                  : () async {
+                      if (urlController.text.isEmpty) return;
+                      
+                      final url = urlController.text.trim();
+                      
+                      // Validate feed
+                      setDialogState(() {
+                        isValidating = true;
+                        validationError = null;
+                      });
+                      
+                      final rssService = RssService();
+                      final result = await rssService.validateFeed(url);
+                      
+                      setDialogState(() => isValidating = false);
+                      
+                      if (!result.valid) {
+                        setDialogState(() {
+                          validationError = result.error ?? 'Invalid feed';
+                        });
+                        return;
+                      }
+                      
+                      // Valid feed, add it
+                      context.read<FeedBloc>().add(
+                        AddFeed(url, categoryId: selectedCategoryId),
+                      );
+                      Navigator.pop(dialogContext);
+                    },
               child: const Text('Add'),
             ),
           ],

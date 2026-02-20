@@ -9,7 +9,26 @@ abstract class ArticleEvent extends Equatable {
   List<Object?> get props => [];
 }
 
-class LoadArticles extends ArticleEvent {}
+class LoadArticles extends ArticleEvent {
+  final int page;
+  final int pageSize;
+  final String? searchQuery;
+  
+  LoadArticles({this.page = 0, this.pageSize = 50, this.searchQuery});
+  
+  @override
+  List<Object?> get props => [page, pageSize, searchQuery];
+}
+
+class LoadMoreArticles extends ArticleEvent {
+  final int page;
+  final int pageSize;
+  
+  LoadMoreArticles({this.page = 1, this.pageSize = 50});
+  
+  @override
+  List<Object?> get props => [page, pageSize];
+}
 
 class LoadArticlesByFeed extends ArticleEvent {
   final int feedId;
@@ -78,11 +97,24 @@ class ArticleLoading extends ArticleState {}
 class ArticleLoaded extends ArticleState {
   final List<Article> articles;
   final ArticleFilter filter;
+  final int currentPage;
+  final int pageSize;
+  final int totalCount;
+  final bool hasMore;
+  final String? searchQuery;
   
-  ArticleLoaded(this.articles, {this.filter = ArticleFilter.all});
+  ArticleLoaded(
+    this.articles, {
+    this.filter = ArticleFilter.all,
+    this.currentPage = 0,
+    this.pageSize = 50,
+    this.totalCount = 0,
+    this.hasMore = false,
+    this.searchQuery,
+  });
   
   @override
-  List<Object?> get props => [articles, filter];
+  List<Object?> get props => [articles, filter, currentPage, pageSize, totalCount, hasMore, searchQuery];
 }
 
 class ArticleError extends ArticleState {
@@ -99,6 +131,7 @@ class ArticleBloc extends Bloc<ArticleEvent, ArticleState> {
 
   ArticleBloc() : super(ArticleInitial()) {
     on<LoadArticles>(_onLoadArticles);
+    on<LoadMoreArticles>(_onLoadMoreArticles);
     on<LoadArticlesByFeed>(_onLoadArticlesByFeed);
     on<LoadSavedArticles>(_onLoadSavedArticles);
     on<LoadUnreadArticles>(_onLoadUnreadArticles);
@@ -112,8 +145,50 @@ class ArticleBloc extends Bloc<ArticleEvent, ArticleState> {
   Future<void> _onLoadArticles(LoadArticles event, Emitter<ArticleState> emit) async {
     emit(ArticleLoading());
     try {
-      final articles = await DatabaseHelper.instance.getAllArticles();
-      emit(ArticleLoaded(articles, filter: _currentFilter));
+      final articles = await DatabaseHelper.instance.getAllArticles(
+        limit: event.pageSize,
+        offset: event.page * event.pageSize,
+        searchQuery: event.searchQuery,
+      );
+      final totalCount = await DatabaseHelper.instance.getArticleCount(searchQuery: event.searchQuery);
+      final hasMore = (event.page + 1) * event.pageSize < totalCount;
+      
+      emit(ArticleLoaded(
+        articles,
+        filter: _currentFilter,
+        currentPage: event.page,
+        pageSize: event.pageSize,
+        totalCount: totalCount,
+        hasMore: hasMore,
+        searchQuery: event.searchQuery,
+      ));
+    } catch (e) {
+      emit(ArticleError(e.toString()));
+    }
+  }
+
+  Future<void> _onLoadMoreArticles(LoadMoreArticles event, Emitter<ArticleState> emit) async {
+    try {
+      final currentState = state;
+      if (currentState is ArticleLoaded) {
+        final articles = await DatabaseHelper.instance.getAllArticles(
+          limit: event.pageSize,
+          offset: event.page * event.pageSize,
+          searchQuery: currentState.searchQuery,
+        );
+        final totalCount = await DatabaseHelper.instance.getArticleCount(searchQuery: currentState.searchQuery);
+        final hasMore = (event.page + 1) * event.pageSize < totalCount;
+        
+        emit(ArticleLoaded(
+          [...currentState.articles, ...articles],
+          filter: _currentFilter,
+          currentPage: event.page,
+          pageSize: event.pageSize,
+          totalCount: totalCount,
+          hasMore: hasMore,
+          searchQuery: currentState.searchQuery,
+        ));
+      }
     } catch (e) {
       emit(ArticleError(e.toString()));
     }

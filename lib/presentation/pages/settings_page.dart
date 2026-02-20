@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../blocs/settings/settings_bloc.dart';
 import '../../core/api/api_service.dart';
+import '../../core/ai/ai_service.dart';
+import '../pages/opml_page.dart';
 
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
@@ -56,9 +58,24 @@ class SettingsPage extends StatelessWidget {
                 ListTile(
                   leading: const Icon(Icons.link),
                   title: const Text('OpenClaw URL'),
-                  subtitle: Text(state.openClawUrl),
-                  onTap: () => _showOpenClawUrlDialog(context, state.openClawUrl),
+                  subtitle: Text(AiService.instance.serverUrl),
+                  onTap: () => _showOpenClawUrlDialog(context),
                 ),
+              const Divider(),
+              
+              // Data Management
+              _sectionHeader('Data Management'),
+              ListTile(
+                leading: const Icon(Icons.import_export),
+                title: const Text('OPML Import/Export'),
+                subtitle: const Text('Backup or restore your feeds'),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const OpmlPage()),
+                  );
+                },
+              ),
               const Divider(),
               
               // Background Section
@@ -221,7 +238,8 @@ class SettingsPage extends StatelessWidget {
     );
   }
 
-  void _showOpenClawUrlDialog(BuildContext context, String currentUrl) {
+  void _showOpenClawUrlDialog(BuildContext context) {
+    final currentUrl = AiService.instance.serverUrl;
     final controller = TextEditingController(text: currentUrl);
     showDialog(
       context: context,
@@ -240,9 +258,14 @@ class SettingsPage extends StatelessWidget {
             child: const Text('Cancel'),
           ),
           TextButton(
-            onPressed: () {
-              context.read<SettingsBloc>().add(UpdateOpenClawUrl(controller.text));
-              Navigator.pop(context);
+            onPressed: () async {
+              await AiService.instance.setServerUrl(controller.text);
+              if (context.mounted) {
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('OpenClaw URL updated')),
+                );
+              }
             },
             child: const Text('Save'),
           ),

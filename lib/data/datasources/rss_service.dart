@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:http/http.dart' as http;
 import 'package:webfeed_plus/webfeed_plus.dart';
 import 'package:html/parser.dart' as html_parser;
@@ -5,6 +6,60 @@ import '../models/feed.dart';
 import '../models/article.dart';
 
 class RssService {
+  /// Validate feed URL before adding
+  Future<FeedValidationResult> validateFeed(String url) async {
+    try {
+      final response = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 10));
+      if (response.statusCode != 200) {
+        return FeedValidationResult(valid: false, error: 'HTTP ${response.statusCode}');
+      }
+      
+      // Try to parse as RSS
+      try {
+        RssFeed.parse(response.body);
+        return FeedValidationResult(valid: true);
+      } catch (_) {
+        // Try to parse as Atom
+        try {
+          AtomFeed.parse(response.body);
+          return FeedValidationResult(valid: true);
+        } catch (_) {
+          return FeedValidationResult(valid: false, error: 'Invalid RSS/Atom format');
+        }
+      }
+    } catch (e) {
+      return FeedValidationResult(valid: false, error: e.toString());
+    }
+  }
+
+  /// Fetch multiple feeds in parallel with concurrency limit
+  Future<List<Feed>> fetchFeedsParallel(List<Feed> feeds, {int concurrencyLimit = 5}) async {
+    final results = <Feed>[];
+    final queue = <Future<Feed?>>[];
+    
+    for (final feed in feeds) {
+      queue.add(fetchFeed(feed.url).then((result) {
+        if (result != null) {
+          results.add(result);
+        }
+        return result;
+      }));
+      
+      // Process in batches
+      if (queue.length >= concurrencyLimit) {
+        await Future.wait(queue);
+        queue.clear();
+      }
+    }
+    
+    // Process remaining
+    if (queue.isNotEmpty) {
+      await Future.wait(queue);
+    }
+    
+    return results;
+  }
+
   Future<Feed?> fetchFeed(String url) async {
     try {
       final response = await http.get(Uri.parse(url));
@@ -165,4 +220,15 @@ class RssService {
     var document = html_parser.parse(htmlString);
     return document.body?.text ?? '';
   }
+}
+
+/// Feed validation result
+class FeedValidationResult {
+  final bool valid;
+  final String? error;
+  
+  FeedValidationResult({required this.valid, this.error});
+  
+  @override
+  String toString() => valid ? 'Valid' : 'Invalid: $error';
 }
